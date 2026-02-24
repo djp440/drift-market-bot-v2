@@ -1,0 +1,26 @@
+[market]
+pair = "SOL-PERP"
+market_index = 0
+leverage = 10
+
+[order]
+min_order_size = 0.1
+base_order_size = 1.0
+spread_bps = 20
+skew_factor = 0.5
+
+[quoting]
+post_only = true
+cancel_timeout_ms = 30000
+price_refresh_threshold = 0.002
+
+[risk]
+max_position_size = 10.0
+max_usdc_exposure = 10000
+emergency_stop_loss = 0.05
+
+[database]
+equity_snapshot_interval_sec = 60
+
+[server]
+port = 3000
