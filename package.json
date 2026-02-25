@@ -16,10 +16,13 @@
     "@iarna/toml": "^3.0.0",
     "@solana/web3.js": "^1.98.4",
     "@triton-one/yellowstone-grpc": "^5.0.3",
+    "better-sqlite3": "^12.6.2",
     "bs58": "^6.0.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "fastify": "^5.7.4"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/bs58": "^4.0.4",
     "@types/node": "^22.13.1",
     "tsx": "^4.19.1",
