@@ -190,9 +190,9 @@
 
 #### 验收标准
 
-- [ ] PositionSide 枚举包含 LONG、SHORT、NONE 三个值
-- [ ] QuoteResult 接口包含所有必要字段
-- [ ] StrategyConfig 接口包含所有策略参数
+- [x] PositionSide 枚举包含 LONG、SHORT、NONE 三个值
+- [x] QuoteResult 接口包含所有必要字段
+- [x] StrategyConfig 接口包含所有策略参数
 
 ### 5.2 策略逻辑子阶段
 
@@ -208,12 +208,12 @@
 
 #### 验收标准
 
-- [ ] calculateSpread() 返回正确的 bidSpread 和 askSpread
-- [ ] calculateBidAsk() 返回正确的 bidPrice、askPrice、bidSize、askSize
-- [ ] calculateOrderSize() 返回正确的 bidSize 和 askSize
-- [ ] 库存偏移逻辑正确：当多头时买单价差增大，卖单价差减小
-- [ ] 所有返回值使用 BN 类型
-- [ ] 策略逻辑与配置参数正确关联
+- [x] calculateSpread() 返回正确的 bidSpread 和 askSpread
+- [x] calculateBidAsk() 返回正确的 bidPrice、askPrice、bidSize、askSize
+- [x] calculateOrderSize() 返回正确的 bidSize 和 askSize
+- [x] 库存偏移逻辑正确：当多头时买单价差增大，卖单价差减小
+- [x] 所有返回值使用 BN 类型
+- [x] 策略逻辑与配置参数正确关联
 
 ---
 
