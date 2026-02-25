@@ -159,16 +159,16 @@
 
 ### 验收标准
 所有测试必须在mainnet上实际进行，以验证订单模块在真实场景的可靠性
-- [ ] cancelAndReplace() 能够在单个交易中完成取消和下单
-- [ ] placeOrder() 正确处理所有 OrderParams 参数
-- [ ] cancelOrder() 能够取消指定订单
-- [ ] cancelAllOrders() 能够取消所有挂单
-- [ ] getOpenOrders() 返回当前所有挂单
-- [ ] 所有 maker 订单正确设置 post-only
-- [ ] 所有卖单正确设置 reduceOnly
-- [ ] 价格和数量正确转换为整数形式
-- [ ] 网络失败时能够自动重试
-- [ ] 单元测试覆盖核心订单操作
+- [x] cancelAndReplace() 能够在单个交易中完成取消和下单
+- [x] placeOrder() 正确处理所有 OrderParams 参数
+- [x] cancelOrder() 能够取消指定订单
+- [x] cancelAllOrders() 能够取消所有挂单
+- [x] getOpenOrders() 返回当前所有挂单
+- [x] 所有 maker 订单正确设置 post-only
+- [x] 所有卖单正确设置 reduceOnly
+- [x] 价格和数量正确转换为整数形式
+- [x] 网络失败时能够自动重试
+- [x] 单元测试覆盖核心订单操作
 
 ---
 
