@@ -27,6 +27,13 @@ export class OracleWatcher {
     this.getOraclePublicKeyFn = getOraclePublicKeyFn;
   }
 
+  addCallback(marketIndex: number, callback: PriceUpdateCallback): void {
+    if (!this.priceUpdateCallbacks.has(marketIndex)) {
+      this.priceUpdateCallbacks.set(marketIndex, []);
+    }
+    this.priceUpdateCallbacks.get(marketIndex)?.push(callback);
+  }
+
   start(marketIndex: number): void {
     if (this.subscriptionIds.has(marketIndex)) {
       this.logger.warn(`市场 ${marketIndex} 的预言机监听已启动`, {});

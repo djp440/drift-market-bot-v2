@@ -36,6 +36,7 @@ export interface StrategyConfig {
     baseOrderSize: BN;
     spreadBps: number;
     skewFactor: number;
+    quoteSource: 'oracle' | 'orderbook';
 
     // 风控参数
     maxPosition: BN;

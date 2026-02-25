@@ -3,6 +3,8 @@ import { ConfigManager } from "./config/ConfigManager.js";
 import { Logger } from "./logger/Logger.js";
 import { DriftClientWrapper } from "./drift/DriftClientWrapper.js";
 import { OracleWatcher } from "./drift/OracleWatcher.js";
+import { OrderExecutor } from "./drift/OrderExecutor.js";
+import { BotEngine } from "./bot/BotEngine.js";
 
 const logger = new Logger("Bootstrap");
 const env = loadEnv();
@@ -28,8 +30,6 @@ const driftClientWrapper = new DriftClientWrapper(
   new Logger("DriftClient")
 );
 
-await driftClientWrapper.initialize();
-
 // 初始化 OracleWatcher
 const oracleWatcher = new OracleWatcher(
   driftClientWrapper.getConnection(),
@@ -38,36 +38,67 @@ const oracleWatcher = new OracleWatcher(
   (marketIndex) => driftClientWrapper.getOraclePublicKey(marketIndex)
 );
 
-// 启动预言机监听
-oracleWatcher.start(config.market.market_index);
+// 初始化 OrderExecutor
+const orderExecutor = new OrderExecutor(
+  driftClientWrapper.getDriftClient(),
+  new Logger("OrderExecutor")
+);
 
-// 订阅账户更新
-driftClientWrapper.subscribe((account) => {
-  logger.info("账户已更新", {
-    authority: account.authority.toBase58(),
-    subAccountId: account.subAccountId,
-  });
-});
+// 初始化 BotEngine
+const botEngine = new BotEngine(
+  driftClientWrapper,
+  orderExecutor,
+  oracleWatcher,
+  configManager,
+  new Logger("BotEngine")
+);
 
-// 监听价格变化
-oracleWatcher.onPriceUpdate(config.market.market_index, (price) => {
-  logger.info("预言机价格更新", {
-    market: config.market.pair,
-    price: price.toString(),
-  });
-});
+// 启动 BotEngine
+try {
+  await botEngine.start();
+  logger.info("BotEngine 已启动");
+} catch (error) {
+  logger.error("BotEngine 启动失败", error);
+  process.exit(1);
+}
 
+// 监听配置更新
 configManager.on("configUpdated", (updatedConfig) => {
   logger.info("配置已更新", {
     market: updatedConfig.market,
     server: updatedConfig.server,
   });
-
-  // 如果市场索引变了，重启预言机监听
-  if (updatedConfig.market.market_index !== config.market.market_index) {
-    oracleWatcher.stop(config.market.market_index);
-    oracleWatcher.start(updatedConfig.market.market_index);
-  }
+  // BotEngine 会自动处理配置更新吗？目前 BotEngine 似乎没有监听 configUpdated。
+  // 根据需求 9.3.3 "BotEngine 监听 configUpdated 事件，动态更新参数"。
+  // 目前 BotEngine 还没有实现这个，但那是后续阶段的任务。
+  // 暂时保留日志。
 });
 
 configManager.watch();
+
+// 优雅退出
+const shutdown = async (signal: string) => {
+  logger.info(`收到 ${signal} 信号，正在停止...`);
+  try {
+    await botEngine.stop();
+    logger.info("BotEngine 已停止，程序退出");
+    process.exit(0);
+  } catch (error) {
+    logger.error("停止过程中发生错误", error);
+    process.exit(1);
+  }
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// 全局异常捕获
+process.on("uncaughtException", (error) => {
+  logger.error("未捕获的异常", error);
+  shutdown("uncaughtException");
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("未处理的 Promise 拒绝", { reason });
+});
+

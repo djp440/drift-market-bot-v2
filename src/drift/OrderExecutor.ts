@@ -120,12 +120,20 @@ export class OrderExecutor {
   /**
    * 获取当前所有挂单
    */
-  getOpenOrders(): Order[] {
+  getOpenOrders(marketIndex?: number): Order[] {
     const userAccount = this.driftClient.getUserAccount();
     if (!userAccount) {
       return [];
     }
-    return userAccount.orders.filter((order) => isVariant(order.status, "open"));
+    return userAccount.orders.filter((order) => {
+      const isOpen = isVariant(order.status, "open");
+      if (!isOpen) return false;
+      
+      if (marketIndex !== undefined) {
+        return order.marketIndex === marketIndex;
+      }
+      return true;
+    });
   }
 
   /**

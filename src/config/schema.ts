@@ -9,6 +9,7 @@ type Config = {
         base_order_size: number;
         spread_bps: number;
         skew_factor: number;
+        quote_source?: "oracle" | "orderbook";
     };
     quoting: {
         post_only: boolean;
@@ -86,6 +87,9 @@ const validateConfig = (config: Config): void => {
     requireMin(requireNumber(config.order?.base_order_size, "order.base_order_size"), "order.base_order_size", 0.0000001);
     requireMin(requireNumber(config.order?.spread_bps, "order.spread_bps"), "order.spread_bps", 0);
     requireRange(requireNumber(config.order?.skew_factor, "order.skew_factor"), "order.skew_factor", 0, 1);
+    if (config.order?.quote_source && config.order.quote_source !== "oracle" && config.order.quote_source !== "orderbook") {
+        throw new Error("配置项 order.quote_source 必须为 'oracle' 或 'orderbook'");
+    }
 
     requireBoolean(config.quoting?.post_only, "quoting.post_only");
     requireMin(requireNumber(config.quoting?.cancel_timeout_ms, "quoting.cancel_timeout_ms"), "quoting.cancel_timeout_ms", 0);

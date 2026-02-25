@@ -1,5 +1,5 @@
 import { BN, PRICE_PRECISION, BASE_PRECISION } from '@drift-labs/sdk';
-import { StrategyConfig, QuoteResult, PositionSide } from './types';
+import { StrategyConfig, QuoteResult, PositionSide } from './types.js';
 
 /**
  * 库存感知报价策略
@@ -10,6 +10,10 @@ export class Strategy {
 
 	constructor(config: StrategyConfig) {
 		this.config = config;
+	}
+
+	public getConfig(): StrategyConfig {
+		return this.config;
 	}
 
 	/**
@@ -46,7 +50,7 @@ export class Strategy {
 		// inventoryRatio = (currentPosition * 10000) / maxPosition
 		// We use 10000 as a scaling factor for precision (similar to BPS)
 		const SCALING_FACTOR = new BN(10000);
-		
+
 		// currentPosition and maxPosition are in BASE_PRECISION
 		const inventoryRatio = currentPosition.mul(SCALING_FACTOR).div(this.config.maxPosition);
 
@@ -112,14 +116,14 @@ export class Strategy {
 			const remainingSell = currentPosition.sub(negMaxPos);
 			askSize = remainingSell.gt(new BN(0)) ? remainingSell : new BN(0);
 		}
-        
-        // 检查最小下单数量
-        if (bidSize.lt(this.config.minOrderSize)) {
-            bidSize = new BN(0);
-        }
-        if (askSize.lt(this.config.minOrderSize)) {
-            askSize = new BN(0);
-        }
+
+		// 检查最小下单数量
+		if (bidSize.lt(this.config.minOrderSize)) {
+			bidSize = new BN(0);
+		}
+		if (askSize.lt(this.config.minOrderSize)) {
+			askSize = new BN(0);
+		}
 
 		return { bidSize, askSize };
 	}

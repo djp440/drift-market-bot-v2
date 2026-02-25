@@ -11,6 +11,7 @@ import {
 } from "@drift-labs/sdk";
 import { Logger } from "../logger/Logger.js";
 import type { DriftEnv } from "../env.js";
+import { DLOBClient } from "./DLOBClient.js";
 
 export { PRICE_PRECISION, QUOTE_PRECISION };
 export type { BN };
@@ -28,6 +29,7 @@ export class DriftClientWrapper {
   private driftClient: DriftClient;
   private logger: Logger;
   private userAccountCallback: ((account: UserAccount) => void) | null = null;
+  private dlobClient: DLOBClient | null = null;
 
   constructor(
     privateKey: Uint8Array,
@@ -73,6 +75,15 @@ export class DriftClientWrapper {
     this.logger.info("DriftClient 初始化完成", {});
   }
 
+  public initializeDLOBClient(marketIndex: number, marketSymbol: string): void {
+    if (this.dlobClient) {
+      return;
+    }
+    this.logger.info("正在初始化 DLOBClient", { marketIndex, marketSymbol });
+    this.dlobClient = new DLOBClient(this.logger, marketIndex, marketSymbol);
+    this.dlobClient.connect();
+  }
+
   async getOraclePrice(marketIndex: number): Promise<BN> {
     const oraclePriceData = this.driftClient.getOracleDataForPerpMarket(marketIndex);
     return oraclePriceData.price;
@@ -88,6 +99,24 @@ export class DriftClientWrapper {
       throw new Error(`Market ${marketIndex} not found`);
     }
     return market.amm.oracle;
+  }
+
+  /**
+   * 获取市场最优买卖价 (L1 Orderbook)
+   * 优先从 DLOBClient 获取实时 L2 数据
+   * 如果不可用，返回 null
+   */
+  async getBestBidAsk(marketIndex: number): Promise<{ bestBid: BN; bestAsk: BN } | null> {
+    if (this.dlobClient) {
+      const dlobQuote = this.dlobClient.getBestBidAsk();
+      if (dlobQuote) {
+        return dlobQuote;
+      }
+    }
+
+    // 如果 DLOB 尚未连接或数据未就绪，暂时返回 null
+    // BotEngine 会处理 null 并回退到 Oracle
+    return null;
   }
 
   async getPosition(marketIndex: number): Promise<Position> {
