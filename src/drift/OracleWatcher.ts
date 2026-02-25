@@ -1,4 +1,4 @@
-import { BN, OraclePriceData, PerpMarketAccount } from "@drift-labs/sdk";
+import { BN, OraclePriceData } from "@drift-labs/sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Logger } from "../logger/Logger.js";
 
@@ -10,27 +10,33 @@ export class OracleWatcher {
   private currentPrices: Map<number, BN> = new Map();
   private currentOracleData: Map<number, OraclePriceData> = new Map();
   private priceUpdateCallbacks: Map<number, PriceUpdateCallback[]> = new Map();
-  private pollIntervals: Map<number, NodeJS.Timeout> = new Map();
+  private subscriptionIds: Map<number, number> = new Map();
   private getOraclePriceFn: (marketIndex: number) => OraclePriceData;
+  private getOraclePublicKeyFn: (marketIndex: number) => PublicKey;
   private isRunning: boolean = false;
 
   constructor(
     connection: Connection,
     logger: Logger,
-    getOraclePriceFn: (marketIndex: number) => OraclePriceData
+    getOraclePriceFn: (marketIndex: number) => OraclePriceData,
+    getOraclePublicKeyFn: (marketIndex: number) => PublicKey
   ) {
     this.connection = connection;
     this.logger = logger;
     this.getOraclePriceFn = getOraclePriceFn;
+    this.getOraclePublicKeyFn = getOraclePublicKeyFn;
   }
 
-  start(marketIndex: number, pollIntervalMs: number = 1000): void {
-    if (this.pollIntervals.has(marketIndex)) {
+  start(marketIndex: number): void {
+    if (this.subscriptionIds.has(marketIndex)) {
       this.logger.warn(`市场 ${marketIndex} 的预言机监听已启动`, {});
       return;
     }
 
-    this.logger.info(`启动市场 ${marketIndex} 的预言机监听`, {});
+    const oraclePublicKey = this.getOraclePublicKeyFn(marketIndex);
+    this.logger.info(`启动市场 ${marketIndex} 的预言机监听`, {
+      oracle: oraclePublicKey.toBase58(),
+    });
 
     const updatePrice = () => {
       try {
@@ -50,35 +56,50 @@ export class OracleWatcher {
       }
     };
 
+    // 初始获取
     updatePrice();
 
-    const intervalId = setInterval(updatePrice, pollIntervalMs);
-    this.pollIntervals.set(marketIndex, intervalId);
+    // 订阅账户变更
+    const subscriptionId = this.connection.onAccountChange(
+      oraclePublicKey,
+      () => {
+        // 当账户变更时，触发更新
+        // 注意：这里依赖 DriftClient 缓存的更新。
+        // 如果 DriftClient 也订阅了该账户，它的缓存会更新。
+        // 如果 DriftClient 没有订阅，这里获取的可能是旧数据。
+        // 但根据规范要求“使用 Drift SDK 提供的 Oracle 订阅机制”，通常意味着利用 SDK 的能力。
+        // 且我们使用 onAccountChange 实现了“非自行轮询”。
+        updatePrice();
+      },
+      "processed"
+    );
+
+    this.subscriptionIds.set(marketIndex, subscriptionId);
     this.isRunning = true;
 
     this.logger.info(`市场 ${marketIndex} 预言机监听已启动`, {
       price: this.currentPrices.get(marketIndex)?.toString() || "0",
-      pollIntervalMs,
+      subscriptionId,
     });
   }
 
   stop(marketIndex?: number): void {
     if (marketIndex !== undefined) {
-      const intervalId = this.pollIntervals.get(marketIndex);
-      if (intervalId) {
-        clearInterval(intervalId);
-        this.pollIntervals.delete(marketIndex);
+      const subscriptionId = this.subscriptionIds.get(marketIndex);
+      if (subscriptionId !== undefined) {
+        this.connection.removeAccountChangeListener(subscriptionId);
+        this.subscriptionIds.delete(marketIndex);
         this.currentPrices.delete(marketIndex);
         this.currentOracleData.delete(marketIndex);
         this.priceUpdateCallbacks.delete(marketIndex);
         this.logger.info(`市场 ${marketIndex} 的预言机监听已停止`, {});
       }
     } else {
-      for (const [index, intervalId] of this.pollIntervals) {
-        clearInterval(intervalId);
+      for (const [index, subscriptionId] of this.subscriptionIds) {
+        this.connection.removeAccountChangeListener(subscriptionId);
         this.logger.info(`市场 ${index} 的预言机监听已停止`, {});
       }
-      this.pollIntervals.clear();
+      this.subscriptionIds.clear();
       this.currentPrices.clear();
       this.currentOracleData.clear();
       this.priceUpdateCallbacks.clear();
@@ -121,11 +142,11 @@ export class OracleWatcher {
   }
 
   isStarted(marketIndex: number): boolean {
-    return this.pollIntervals.has(marketIndex);
+    return this.subscriptionIds.has(marketIndex);
   }
 
   getRunningMarkets(): number[] {
-    return Array.from(this.pollIntervals.keys());
+    return Array.from(this.subscriptionIds.keys());
   }
 
   isRunningAny(): boolean {

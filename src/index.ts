@@ -34,7 +34,8 @@ await driftClientWrapper.initialize();
 const oracleWatcher = new OracleWatcher(
   driftClientWrapper.getConnection(),
   new Logger("OracleWatcher"),
-  (marketIndex) => driftClientWrapper.getOraclePriceData(marketIndex)
+  (marketIndex) => driftClientWrapper.getOraclePriceData(marketIndex),
+  (marketIndex) => driftClientWrapper.getOraclePublicKey(marketIndex)
 );
 
 // 启动预言机监听

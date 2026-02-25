@@ -82,6 +82,14 @@ export class DriftClientWrapper {
     return this.driftClient.getOracleDataForPerpMarket(marketIndex);
   }
 
+  getOraclePublicKey(marketIndex: number): PublicKey {
+    const market = this.driftClient.getPerpMarketAccount(marketIndex);
+    if (!market) {
+      throw new Error(`Market ${marketIndex} not found`);
+    }
+    return market.amm.oracle;
+  }
+
   async getPosition(marketIndex: number): Promise<Position> {
     try {
       const userAccount = this.driftClient.getUserAccount();

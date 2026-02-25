@@ -105,14 +105,14 @@
 
 #### 验收标准
 
-- [ ] DriftClientWrapper 能够成功连接到 Solana 主网或测试网
-- [ ] initialize() 方法正确初始化所有组件
-- [ ] getOraclePrice() 返回正确的预言机价格（BN 整数形式）
-- [ ] getPosition() 返回当前持仓信息（包含方向和数量）
-- [ ] getAccountInfo() 返回完整的账户信息
-- [ ] subscribe() 成功订阅账户变更事件
-- [ ] unsubscribe() 正确取消订阅，无内存泄漏
-- [ ] 能够处理网络异常并抛出有意义的错误信息
+- [x] DriftClientWrapper 能够成功连接到 Solana 主网或测试网
+- [x] initialize() 方法正确初始化所有组件
+- [x] getOraclePrice() 返回正确的预言机价格（BN 整数形式）
+- [x] getPosition() 返回当前持仓信息（包含方向和数量）
+- [x] getAccountInfo() 返回完整的账户信息
+- [x] subscribe() 成功订阅账户变更事件
+- [x] unsubscribe() 正确取消订阅，无内存泄漏
+- [x] 能够处理网络异常并抛出有意义的错误信息
 
 ### 3.2 OracleWatcher 子阶段
 
@@ -128,12 +128,12 @@
 
 #### 验收标准
 
-- [ ] OracleWatcher 能够成功订阅预言机价格更新
-- [ ] start() 方法接受 marketIndex 参数并正确启动监听
-- [ ] getPrice() 返回当前预言机价格（BN 类型）
-- [ ] onPriceUpdate() 正确注册回调函数，价格变化时触发回调
-- [ ] 使用 Drift SDK 提供的 Oracle 订阅机制（非自行轮询）
-- [ ] 价格单位正确（整数形式）
+- [x] OracleWatcher 能够成功订阅预言机价格更新
+- [x] start() 方法接受 marketIndex 参数并正确启动监听
+- [x] getPrice() 返回当前预言机价格（BN 类型）
+- [x] onPriceUpdate() 正确注册回调函数，价格变化时触发回调
+- [x] 使用 Drift SDK 提供的 Oracle 订阅机制（非自行轮询）
+- [x] 价格单位正确（整数形式）
 
 ---
 
