@@ -26,7 +26,7 @@ export class Strategy {
 	public calculateSpread(
 		oraclePrice: BN,
 		currentPosition: BN
-	): { bidSpread: BN; askSpread: BN } {
+	): { bidSpread: BN; askSpread: BN; debug?: any } {
 		// 基础价差的一半 (Base Half Spread)
 		// spreadBps is in basis points (1/10000)
 		// spread = price * spreadBps / 10000
@@ -78,6 +78,13 @@ export class Strategy {
 		return {
 			bidSpread: finalBidSpread,
 			askSpread: finalAskSpread,
+			debug: {
+				baseHalfSpread: baseHalfSpread.toString(),
+				inventoryRatio: inventoryRatio.toString(),
+				spreadAdjustment: spreadAdjustment.toString(),
+				skewFactor: this.config.skewFactor,
+				maxPosition: this.config.maxPosition.toString()
+			}
 		};
 	}
 

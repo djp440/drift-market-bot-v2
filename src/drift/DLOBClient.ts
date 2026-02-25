@@ -95,17 +95,42 @@ export class DLOBClient extends EventEmitter {
     }
 
     private handleL2Update(data: any): void {
-        // data structure: { marketIndex, bids: [], asks: [], ... }
+        // data structure: 
+        // { 
+        //   marketIndex: number, 
+        //   marketType: string, 
+        //   bids: [{ price: "123", size: "100" }, ...], 
+        //   asks: [{ price: "124", size: "100" }, ...] 
+        // }
         // 注意：Drift DLOB 返回的 price 是缩放后的字符串 (PRICE_PRECISION)
         
+        // 解析 Bids (买单)，通常是降序排列 (High -> Low)，Best Bid 是第一个
         if (data.bids && data.bids.length > 0) {
-            // bids are sorted desc (best bid is first)
-            this.bestBid = new BN(data.bids[0].price);
+            // 安全起见，我们取第一个价格
+            // 注意：某些情况下 DLOB 可能返回空数组或不规范数据
+            const priceStr = data.bids[0].price;
+            if (priceStr) {
+                this.bestBid = new BN(priceStr);
+            }
         }
 
+        // 解析 Asks (卖单)，通常是升序排列 (Low -> High)，Best Ask 是第一个
         if (data.asks && data.asks.length > 0) {
-            // asks are sorted asc (best ask is first)
-            this.bestAsk = new BN(data.asks[0].price);
+            const priceStr = data.asks[0].price;
+            if (priceStr) {
+                this.bestAsk = new BN(priceStr);
+            }
+        }
+
+        // 简单的验证：Best Ask 必须大于 Best Bid (除非出现倒挂，极少见)
+        // 如果数据异常（例如倒挂严重），可能需要忽略或报警
+        if (this.bestBid && this.bestAsk && this.bestBid.gt(this.bestAsk)) {
+            this.logger.warn("DLOB 出现买卖倒挂 (Crossed Market)", {
+                bid: this.bestBid.toString(),
+                ask: this.bestAsk.toString()
+            });
+            // 这种情况下，Mid Price 计算仍然是 (Bid+Ask)/2，虽然倒挂但数学上 Mid 还在中间。
+            // 但这暗示数据可能不稳定。
         }
 
         // this.logger.debug("DLOB L2 更新", { 

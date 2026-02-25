@@ -1,14 +1,14 @@
 [market]
 pair = "SOL-PERP"
 market_index = 0
-leverage = 3
+leverage = 5
 
 [order]
 min_order_size = 0.01
 base_order_size = 0.01
 spread_bps = 10
 skew_factor = 0.5
-quote_source = "orderbook" # "oracle" or "orderbook"
+quote_source = "oracle" # "oracle" or "orderbook"
 
 [quoting]
 post_only = true
@@ -16,7 +16,7 @@ cancel_timeout_ms = 30000
 price_refresh_threshold = 0.002
 
 [risk]
-max_position_size = 10.0
+max_position_size = 1
 max_usdc_exposure = 10000
 emergency_stop_loss = 0.05
 

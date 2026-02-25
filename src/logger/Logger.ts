@@ -20,7 +20,7 @@ const RESET_COLOR = "\u001b[0m";
 class Logger {
   private static initialized = false;
   private static fileStream: fs.WriteStream | null = null;
-  private static level: LogLevel = "DEBUG";
+  private static level: LogLevel = "INFO";
   private static logDir: string = path.resolve(process.cwd(), "logs");
   private static logFilePath: string | null = null;
   private moduleName: string;

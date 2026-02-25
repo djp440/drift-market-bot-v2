@@ -8,6 +8,11 @@ import {
   BN,
   IWallet,
   OraclePriceData,
+  EventSubscriber,
+  OrderActionRecord,
+  EventType,
+  isVariant,
+  WrappedEvent,
 } from "@drift-labs/sdk";
 import { Logger } from "../logger/Logger.js";
 import type { DriftEnv } from "../env.js";
@@ -30,6 +35,9 @@ export class DriftClientWrapper {
   private logger: Logger;
   private userAccountCallback: ((account: UserAccount) => void) | null = null;
   private dlobClient: DLOBClient | null = null;
+  private eventSubscriber: EventSubscriber | null = null;
+  private orderFillCallback: ((record: OrderActionRecord) => void) | null = null;
+  private orderCancelCallback: ((record: OrderActionRecord) => void) | null = null;
 
   constructor(
     privateKey: Uint8Array,
@@ -72,7 +80,59 @@ export class DriftClientWrapper {
 
     await this.driftClient.subscribe();
 
+    // 初始化 EventSubscriber
+    // 监听所有事件，然后手动过滤
+    this.eventSubscriber = new EventSubscriber(this.connection, this.driftClient.program, {
+      maxTx: 4096,
+      orderBy: "blockchain",
+      orderDir: "desc",
+      commitment: "confirmed",
+      logProviderConfig: {
+        type: "websocket",
+        maxReconnectAttempts: 5,
+      },
+    });
+
+    // 订阅并开始接收事件
+    await this.eventSubscriber.subscribe();
+
+    // 获取当前用户的 PublicKey (默认为 subAccountId=0)
+    // 注意：getUserAccountPublicKey() 是异步的
+    const userKey = await this.driftClient.getUserAccountPublicKey();
+
+    this.eventSubscriber.eventEmitter.on("newEvent", (event: WrappedEvent<EventType>) => {
+      if (event.eventType === "OrderActionRecord") {
+        const record = event as unknown as OrderActionRecord;
+
+        // 检查是否涉及当前用户 (taker 或 maker)
+        // OrderActionRecord 有 taker 和 maker 字段，类型为 PublicKey | null
+        const isTaker = record.taker && record.taker.equals(userKey);
+        const isMaker = record.maker && record.maker.equals(userKey);
+
+        if (isTaker || isMaker) {
+          // 检查是否是成交事件 (fill)
+          if (isVariant(record.action, "fill")) {
+            if (this.orderFillCallback) {
+              this.orderFillCallback(record);
+            }
+          } else if (isVariant(record.action, "cancel")) {
+            if (this.orderCancelCallback) {
+              this.orderCancelCallback(record);
+            }
+          }
+        }
+      }
+    });
+
     this.logger.info("DriftClient 初始化完成", {});
+  }
+
+  public subscribeOrderFill(callback: (record: OrderActionRecord) => void): void {
+    this.orderFillCallback = callback;
+  }
+
+  public subscribeOrderCancel(callback: (record: OrderActionRecord) => void): void {
+    this.orderCancelCallback = callback;
   }
 
   public initializeDLOBClient(marketIndex: number, marketSymbol: string): void {

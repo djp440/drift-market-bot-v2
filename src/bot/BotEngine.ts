@@ -111,6 +111,16 @@ export class BotEngine {
       this.eventHandler.onPositionChange();
     });
 
+    // 订阅订单成交事件
+    this.driftClientWrapper.subscribeOrderFill((record) => {
+      this.eventHandler.onOrderFill(record);
+    });
+
+    // 订阅订单取消事件
+    this.driftClientWrapper.subscribeOrderCancel((record) => {
+      this.eventHandler.onOrderCancel(record);
+    });
+
     // 初始状态同步
     await this.syncState();
 
@@ -276,7 +286,7 @@ export class BotEngine {
 
     const { bidSize, askSize } = this.strategy.calculateOrderSize(this.currentPosition);
     // 传入 midPrice 作为基准价格计算 spread
-    const { bidSpread, askSpread } = this.strategy.calculateSpread(midPrice, this.currentPosition);
+    const { bidSpread, askSpread, debug } = this.strategy.calculateSpread(midPrice, this.currentPosition);
     const bidPrice = midPrice.sub(bidSpread);
     const askPrice = midPrice.add(askSpread);
 
@@ -350,7 +360,21 @@ export class BotEngine {
     if (newOrders.length > 0 || cancelIds.length > 0) {
       this.logger.info("执行做市订单调整", {
         cancelCount: cancelIds.length,
-        newOrderCount: newOrders.length
+        newOrderCount: newOrders.length,
+        strategyDetails: {
+          oraclePrice: this.currentOraclePrice.toString(),
+          midPrice: midPrice.toString(),
+          position: this.currentPosition.toString(),
+          bidSize: bidSize.toString(),
+          askSize: askSize.toString(),
+          bidPrice: bidPrice.toString(),
+          askPrice: askPrice.toString(),
+          bidSpread: bidSpread.toString(),
+          askSpread: askSpread.toString(),
+          skewFactor: this.strategy.getConfig().skewFactor,
+          quoteSource: this.strategy.getConfig().quoteSource,
+          debug
+        }
       });
 
       this.lastOrderTime = Date.now();
@@ -416,27 +440,53 @@ export class BotEngine {
 
   // Event Handlers
   public async handleOrderFill(record: OrderActionRecord): Promise<void> {
-    this.logger.info("订单成交，重置下单冷却，并等待订单状态同步");
+    this.logger.info("检测到订单成交", {
+      ts: record.ts.toString(),
+      marketIndex: record.marketIndex
+    });
+
+    // 立即重置冷却时间，允许尽快响应
     this.lastOrderTime = 0;
+
+    // 设置“等待同步”标志，防止在撤单完成前过早挂单
+    // 但这个标志会在 runMarketMakingMode 中被处理（如果订单列表为空则清除）
     this.isWaitingForOrderUpdate = true;
     this.waitingStartTime = Date.now();
 
-    try {
-      // 订单成交后，立即取消所有剩余挂单（包括对手方订单），以符合"本轮结束"的规范
-      // 注意：cancelAllOrders 发送交易后，本地的 UserAccount 可能尚未更新
-      // 因此我们不立即调用 runLoop，而是等待 OrderCancel 事件或下一次定时循环
-      await this.orderExecutor.cancelAllOrders(this.marketIndex);
-    } catch (error) {
-      this.logger.error("订单成交后撤单失败", error);
-    }
+    // 触发原子清理：撤销剩余所有挂单
+    // 我们不需要等待这个 Promise 完成才去同步状态，可以并行
+    this.orderExecutor.cancelAllOrders(this.marketIndex).catch(err => {
+      this.logger.error("订单成交后撤单失败", err);
+    });
 
-    // 更新状态但不立即触发 runLoop，避免在撤单尚未同步时挂单
+    // 立即同步状态（余额、仓位）
     await this.syncState();
+
+    // 触发主循环，runMarketMakingMode 会检查 isWaitingForOrderUpdate
+    // 如果 cancelAllOrders 还没完成，runLoop 会检测到 openOrders 还没清空，从而等待
+    // 如果 cancelAllOrders 完成了，openOrders 为空，runLoop 会立即挂新单
+    this.runLoop();
   }
 
-  public handleOrderCancel(record: OrderActionRecord): void {
-    this.syncState();
-    this.runLoop(); // Trigger runLoop on cancel to potentially replace orders
+  public async handleOrderCancel(record: OrderActionRecord): Promise<void> {
+    // 订单取消后，可能是主动撤单，也可能是被动撤单（如 IOC/Fill）
+    // 如果处于等待订单更新的状态（通常是因为正在进行主动清理或原子撤单），
+    // 那么这个撤单事件是预期的，我们不需要做额外的处理，也不需要打印日志刷屏
+    if (this.isWaitingForOrderUpdate) {
+      // this.logger.debug("忽略主动撤单事件", { ts: record.ts.toString() });
+      return;
+    }
+
+    this.logger.info("检测到意外订单取消", {
+      ts: record.ts.toString(),
+      marketIndex: record.marketIndex
+    });
+
+    // 我们需要重新评估挂单状态
+    await this.syncState();
+
+    // 立即触发循环以补单
+    this.runLoop();
   }
 
   public async handlePositionChange(): Promise<void> {
@@ -444,14 +494,17 @@ export class BotEngine {
     await this.syncState(); // 更新 this.currentPosition
 
     if (!this.currentPosition.eq(oldPosition)) {
-      this.logger.info("仓位发生变化，重置下单冷却", {
+      this.logger.info("仓位发生变化", {
         old: oldPosition.toString(),
         new: this.currentPosition.toString()
       });
-      this.lastOrderTime = 0; // 重置冷却
+      // 在纯事件驱动模式下，不需要在这里重置冷却或触发 runLoop
+      // 因为 handleOrderFill 会负责处理成交后的逻辑
+      // handlePositionChange 主要作为状态同步的兜底
     }
 
-    this.runLoop();
+    // 移除 runLoop()，避免与 handleOrderFill/handleOrderCancel 冲突导致重复挂单
+    // this.runLoop();
   }
 
   public handleOracleUpdate(price: BN): void {
